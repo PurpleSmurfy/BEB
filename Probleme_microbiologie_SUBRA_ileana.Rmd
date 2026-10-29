@@ -1,0 +1,321 @@
+---
+title: "Probleme_microbiologie_SUBRA_ileana"
+output: pdf_document
+date: "2026-10-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r} 
+#Lecture des données
+srs_pop <-read.table(file='Detection_Table(1).csv', header=FALSE)
+nbgr <- dim(srs_pop)[1] 
+nbsp <- 150 # le nombre d'espèces, ici 150.
+```
+installation du package sampling pour effectuer différents types 
+d'échantillonnages.
+```{r}
+library(sampling)
+```
+```{r}
+set.seed(2026)
+#crée les échantillons
+ech_sans_rem <- srswor(nbsp,nbgr) 
+# On fait un tirage aléatoire simple sans remise, chaque espèce ne peut être 
+# sélectionné qu'une fois.
+```
+```{r}
+sample_e <- as.vector(srs_pop$V1[ech_sans_rem==1]) 
+# sous forme de vecteur on 
+#extrait les individus pour lesquels l'indicateur = 1. Si =1 l'individu est 
+#contaminé si =0, il ne l'est pas.
+```
+```{r}
+# calcul de la contamination
+prop_pop <- sum(srs_pop$V1)/nbgr 
+# proportion d'individus contaminés dans la population avec srs_pop$V1 le 
+# nombre d'individus contaminés.
+p_ech <- sum(sample_e)/nbsp 
+# proportion d'individus contaminés dans l'échantillon.
+# on calcul les deux afin de les comparer car dans la réalité on connait 
+# rarement la proportion de contamination dans une population.
+```
+```{r}
+# on établi un intervalle de confiance bilatéral à 95%
+t_ech <- qt(0.025,149,lower.tail = FALSE, log.p = FALSE) 
+# qt calcul le quantile de la loi de student, le degré de liberté correspond à 
+# la taille de l'échantillon-1
+v_ech <- p_ech*(1.0-p_ech)*(1.0-nbsp/nbgr) 
+# on calcul la variance pour déterminer l'incertitude dû à la proportion de 
+# l'échantillon. On multiplie par le facteur de correction de la variance 
+# sans remise
+mu_min <- p_ech-t_ech*sqrt(v_ech/nbsp)
+mu_max <- p_ech+t_ech*sqrt(v_ech/nbsp)
+#mu_min et mu_max sont les bornes minimales et maximales de l'intervalle.
+```
+```{r}
+print(c(mu_min,p_ech,mu_max)) 
+# Pour visualiser l'intervalle et la proportion de contamination calculé.
+```
+On essaye d'estimer le nombre d'individus contaminé à partir de la proportion 
+de contamination de l'échantillon. Pour cela, on multiplie la proportion par la 
+taille de la population, le résultat est arrondi à l'entier le plus proche.
+```{r}
+N_ech <- round((sum(sample_e)/nbsp)*nbgr)
+N_pop <- sum(srs_pop$V1) 
+# calcul le nombre d'individus contaminés dans la population.
+V_ech_2 <- p_ech*(1.0-p_ech)*(1.0-nbsp/nbgr)*nbgr^2 
+# on calcul la variance de l'estimation ainsi que son intervalle. 
+# On définit Mu_min et Mu_max comme les bornes supérieures et inférieures 
+# de l'intervalle.
+Mu_min <- N_ech-t_ech*sqrt(V_ech_2/nbsp)
+Mu_max <- N_ech+t_ech*sqrt(V_ech_2/nbsp)
+print(c(Mu_min,N_ech,Mu_max))
+```
+
+```{r}
+# On fait un tirage mais cette fois avec remise.
+ech_rem <- srswr(nbsp,nbgr)
+sample_r <- ech_rem [ech_rem>=1] # comme un individus peut être sélectionné 
+# plusieurs fois, on a désormais un signe >= et non plus =1. calcul le  nombre 
+# de fois où les individus sélectionnés l'ont été.
+print(sample_r)
+```
+
+```{r}
+sample_u <- srs_pop$V1[ech_rem>=1] # on calcul le nombre d'individus contaminés 
+# parmis ceux sélectionnés. Si un 1 s'affiche, l'individu est contaminé si 
+# c'est=0 alors il ne l'est pas.
+sample_v <- 1:nbsp # on crée un vecteur qui va contenir les observations des 
+# 150 tirages effectués dans la boucle qui va suivre.
+index <- 1 # précise la position de la prochaine observation.
+for (i in 1:length(sample_r)) { # le nombre d'individus qui ont été sélectionné
+  sgr <- rep(sample_u[i],sample_r[i]) 
+  # on répète le nombre de fois que chaque individus à été sélectionné, avec i 
+  # le nombre de répétition.
+  sample_v[index:(index+sample_r[i]-1)]<- sgr 
+  # Cette ligne nous permet d'ordonner les tirages de 1 à 150
+  index <- index+sample_r[i] # on assigne la position suivante
+  print(c(i,index,sgr)) # Nous montre les résultats ordonnés.
+}
+```
+```{r}
+sample_e <- as.vector(sample_v)
+p_ech_r_2 <- sum(sample_e)/nbsp 
+# On calcul la proportion de contamination dans notre échantillon. Ici 0.28 donc
+# une proportion de contamination estimée à 28%
+v_ech_r <- p_ech_r_2*(1.0-p_ech_r_2) # On calcul la variance de la proportion de 
+# contamination. Ici 0.20, variance estimée à 20%
+```
+
+```{r}
+# Lire les données
+srs_pop <- read.table("Detection_Table(1).csv", header = FALSE)
+
+# On extrait chaque groupe
+grp_A <- srs_pop[srs_pop$V2 == "A", ]
+grp_B <- srs_pop[srs_pop$V2 == "B", ]
+grp_N <- srs_pop[srs_pop$V2 == "N", ]
+
+# Proportion contamination estimée dans chaque groupe
+prop_N <- mean(grp_N$V1 == 1)
+prop_A <- mean(grp_A$V1 == 1)
+prop_B <- mean(grp_B$V1 == 1)
+
+resultats_groupes <- data.frame(
+  Groupe = c("N", "A", "B"),
+  Nombre_UE = c(
+    nrow(grp_N),
+    nrow(grp_A),
+    nrow(grp_B)
+  ),
+  Proportion_contaminee = c(
+    prop_N,
+    prop_A,
+    prop_B
+  )
+)
+
+print(resultats_groupes) 
+```
+On observe une différence dans la proportion de contamination. On devra alors 
+réaliser un échantillonnage stratifié sans remise. La contamination présupposée
+du groupe A est de 18.5%, celle du groupe B de 30.5% et du groupe N de 22.1%.
+```{r}
+# Lecture des données
+srs_pop <- read.table(file = "Detection_Table(1).csv",
+                      header = FALSE,
+                      sep = ",")
+
+# Taille totale de la population et de l'échantillon
+nbgr <- dim(srs_pop)[1]
+# On défini les groupes :
+Grp_A_tot <-  grp_A[apply(grp_A[, 3:10] == 1, 1, any), ]
+Grp_B_tot <-  grp_B[apply(grp_B[, 3:10] == 1, 1, any), ]
+Grp_N_tot <-  grp_N[apply(grp_N[, 3:10] == 1, 1, any), ]
+```
+```{r}
+# Ajouter une variable indiquant le groupe de chaque individu
+Grp_A_tot$Groupe <- "A"
+Grp_B_tot$Groupe <- "B"
+Grp_N_tot$Groupe <- "N"
+
+# Réunir les trois groupes
+pop_filtre <- rbind(Grp_A_tot, Grp_B_tot, Grp_N_tot)
+
+# Taille totale de la population filtrée
+nbgr <- nrow(pop_filtre)
+
+print(nbgr)
+# Effectifs de chaque strate
+tab_strates <- table(pop_filtre$Groupe)
+
+print(tab_strates)
+
+# Allocation proportionnelle
+ech_eff <- round(tab_strates * nbsp / nbgr)
+
+# Corriger les arrondis pour obtenir exactement 150 individus
+while (sum(ech_eff) != nbsp) {
+  if (sum(ech_eff) < nbsp) {
+    i <- which.max(tab_strates * nbsp / nbgr - ech_eff)
+    ech_eff[i] <- ech_eff[i] + 1
+  } else {
+    i <- which.max(ech_eff - tab_strates * nbsp / nbgr)
+    ech_eff[i] <- ech_eff[i] - 1
+  }
+}
+
+print(ech_eff)
+```
+```{r}
+library(sampling)
+
+# Échantillonnage stratifié sans remise
+ech_res <- strata(
+  pop_filtre,
+  stratanames = "Groupe",
+  size = as.vector(ech_eff),
+  method = "srswor"
+)
+
+# Extraire les individus sélectionnés
+ech_val <- getdata(pop_filtre, ech_res)
+
+# Vérifier le nombre d'individus sélectionnés
+nrow(ech_val)
+
+# Vérifier la répartition par strate
+table(ech_val$Groupe)
+```
+
+
+```{r}
+# Extraction des effectifs réels par strate
+N_h <- as.numeric(tab_strates)
+names(N_h) <- names(tab_strates)
+
+# Effectifs échantillonnés par strate
+n_h <- as.numeric(ech_eff)
+names(n_h) <- names(ech_eff)
+
+# Proportion de présence présupposée dans chaque strate
+p_h <- tapply(ech_val$V1,
+              ech_val$Groupe,
+              mean)
+
+print(p_h)
+
+# Estimation globale pondérée de la proportion
+poids <- N_h / nbgr
+
+p_global <- sum(poids[names(p_h)] * p_h)
+
+# Estimation du nombre d'UE dont la présence est présupposée
+# dans la population filtrée
+N_estime <- nbgr * p_global
+
+print(p_global)
+print(N_estime)
+```
+```{r}
+# Variance estimée de la proportion dans chaque strate
+S2_h <- tapply(ech_val$V1,
+               ech_val$Groupe,
+               var)
+
+# Correction de population finie
+f_h <- n_h / N_h
+
+# Variance de l'estimateur stratifié
+var_global <- sum(
+  (poids[names(p_h)]^2) *
+    (1 - f_h[names(p_h)]) *
+    S2_h[names(p_h)] /
+    n_h[names(p_h)],
+  na.rm = TRUE
+)
+
+# Erreur-type
+se_global <- sqrt(var_global)
+
+# Intervalle de confiance approximatif à 95 %
+IC_p <- p_global + c(-1, 1) * 1.96 * se_global
+
+# Limiter les bornes à [0, 1]
+IC_p <- pmax(0, pmin(1, IC_p))
+
+# Estimation du nombre total d'UE
+N_estime <- nbgr * p_global
+
+# Intervalle de confiance du nombre total
+IC_N <- nbgr * IC_p
+
+# Affichage des résultats
+cat("Proportion estimée :", p_global, "\n")
+cat("Erreur-type :", se_global, "\n")
+
+cat("IC 95 % de la proportion :",
+    IC_p[1], "-", IC_p[2], "\n")
+
+cat("Nombre estimé d'UE :", N_estime, "\n")
+
+cat("IC 95 % du nombre d'UE :",
+    IC_N[1], "-", IC_N[2], "\n")
+```
+```{r}
+# UE échantillonnées dont la présence est présupposée absente
+UE_absentes <- ech_val[ech_val$V1 == 0, ]
+
+# Résultats des huit essais de détection
+det_absentes <- as.matrix(UE_absentes[, 3:10])
+
+# Nombre total de tests
+nb_tests <- length(det_absentes)
+
+# Nombre de résultats positifs
+nb_positifs <- sum(det_absentes == 1)
+
+# Estimation de la probabilité de faux positifs
+p_fp_estime <- nb_positifs / nb_tests
+
+# Intervalle de confiance binomial exact à 95 %
+IC_fp <- binom.test(
+  nb_positifs,
+  nb_tests,
+  conf.level = 0.95
+)$conf.int
+
+# Affichage
+cat("Probabilité estimée de faux positifs :",
+    p_fp_estime, "\n")
+
+cat("Intervalle de confiance à 95 % :",
+    IC_fp[1], "-", IC_fp[2], "\n")
+
+cat("Probabilité théorique : 0.18\n")
+```
+On observe une probabilité de faux positif de 21.7% à un intervalle de confiance de 95%, cette valeur dépasse la probabilité théorique de 18%. Cela pourrait venir du calcul utilisé.
+
