@@ -1,0 +1,97 @@
+---
+title: "probleme_physique_SUBRA_ileana"
+output: html_document
+date: "2026-10-29"
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+sim_ep <- function() {
+  dist_cm_0 <- 200 + floor(runif (n=1, min=0, max =(1 + (400-200)/10)))*10
+  nb_mes <- 0
+  arret_obs <- FALSE 
+  dist_stop <- NA
+  dist_cm_t <- dist_cm_0
+  while (dist_cm_t>0){
+    dist_cm_t = dist_cm_t-10
+    piece <- sample(c("face","pile"),1,prob=c(0.5,0.5)) # on a une chance sur deux pile ou face soit tiré, si c'est face on fait une mesure de la distance.
+  if(piece=="face"){
+    nb_mes<-nb_mes + 1
+    #mesure
+    temps_ms<-1000000*2*dist_cm_t/34000 # l'observation en millisecondes et distance en centimètres, rapport à la vitesse du son.
+    if (dist_cm_t==50){ # si la distance est strictement égale à 50cm on s'arrête 
+      arret_obs<-TRUE
+      dist_stop<-dist_cm_t
+      break}
+    if (dist_cm_t<50){
+      arret_obs<-FALSE
+      dist_stop<-dist_cm_t
+      break
+      }
+    }
+  }
+  return(list(arret_obs=arret_obs,
+              nb_mes=nb_mes,
+              dist_stop=dist_stop))
+}
+```
+
+```{r}
+nb_exp<- 10000
+  resNexp<- replicate(nb_exp,sim_ep(),simplify = FALSE)
+  hst_nbm<- sapply(resNexp,function(x) x$nb_mes)
+  hist(hst_nbm,breaks="sturges",freq=FALSE) # on observe une distribution en cloche avec un maximum vers 10.
+```
+```{r}
+n_sim<- 30
+vec_prop<- rep(0,n_sim)
+for(i in 1:n_sim){
+  res_sim<- replicate(30,sim_ep(),simplify = FALSE)
+  val_obj<- sapply(res_sim,function(x) x$arret_obs)
+  prop<- length(val_obj[val_obj==TRUE])/30
+  vec_prop[i]<- prop
+}
+hist(vec_prop,breaks="sturges",freq=FALSE, col="slateblue2") # on observe un maximum aux alentours de 0.55 soit environ 55%.
+```
+```{r}
+n_sim<- 1000
+vec_prop<- rep(0,n_sim)
+for(i in 1:n_sim){
+  res_sim<- replicate(30,sim_ep(),simplify = FALSE)
+  val_obj<- sapply(res_sim,function(x) x$arret_obs)
+  prop<- length(val_obj[val_obj==TRUE])/30
+  vec_prop[i]<- prop
+}
+hist(vec_prop,breaks="sturges",freq=FALSE, col="slateblue2") # avec un plus grand nombre de répétition, l'histogramme prends un peu plus une forme en cloche avec un maximum légèrement en dessous de 50%. Nos valeurs tournent toujours aux alentours de 50% et s'en rapproche plusavec l'augmentation des répétitions car la probabilité d'avoir les mesures attendues est lié au lancé de la pièce qui a une chance sur deux de donner pile ou face.
+```
+```{r}
+#Pourcentage :
+# Calcul de la proportion moyenne d'arrêts à 50 cm
+prop_moy <- mean(vec_prop)
+
+# Conversion de la proportion en pourcentage
+pourcentage <- prop_moy * 100
+
+# Affichage du résultat
+print(pourcentage) # il y a donc environ 49% des cas pour lesquels il y a eu un arrêt à 50cm
+```
+
+```{r}
+n_sim<- 1000
+vec_prop<- rep(0,n_sim)
+for(i in 1:n_sim){
+  res_sim<- replicate(30,sim_ep(),simplify = FALSE)
+  val_obj<- sapply(res_sim,function(x) x$dist_stop)
+  prop<- length(val_obj[val_obj>0])/30
+  vec_prop[i]<- prop
+}
+hist(vec_prop,breaks="sturges",freq=FALSE, col="slateblue2")
+```
+```{r}
+#Question 1 : On dispose de variables quantitatives (distance,temps, nombre de mesure) et qualitative (la pièce fait pile ou face).
+#Question 2 : Le nombre de mesure sera variable en fonction des résultats de la pièce et du nombre de répétition de l'expérience.
+#Question 3 : Sur une répétition de 30 fois on estime à environ 49% le pourcentage de fois où l'on s'arrête dans les conditions désirées.
+#Question 4 : Il n'est pas toujours possible d'arrêter dans les conditions choisies avant que l'objectif ne touche la paroi du fait de la forme aléatoire du lancer de pièce.
+```
