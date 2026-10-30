@@ -1,0 +1,350 @@
+---
+title: "Examen_final_SUBRA_ileana"
+output: pdf_document
+date: "2026-10-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+# Nombre d'échantillons par station
+n <- 15
+
+# Création des stations avec factor car les valeurs ne sont pas numériques.
+station <- factor(rep(c("A", "V", "E"), each = n),
+                  levels = c("A", "V", "E"))
+
+# Température des sédiments et fixation pour la reproductibilité
+set.seed(2026)
+
+tempera <- c(
+  rnorm(n, mean = 14, sd = 1.2),
+  rnorm(n, mean = 16, sd = 1.2),
+  rnorm(n, mean = 17, sd = 1.2)
+)
+
+# Matière organique
+# Hypothèse : 1000 essais suivant une loi binomiale par échantillon avec une 
+# proportion moyenne de poids sec de 2.5%. 
+mat_org <- rbinom(3*n, size = 1000, prob = 0.025) / 1000
+
+# Influence urbaine, on établit différentes probabilités selon les stations
+# A=50%, V=85% et E=60%
+inf_urb <- c(
+  rbinom(n, size = 1, prob = 0.50),
+  rbinom(n, size = 1, prob = 0.85),
+  rbinom(n, size = 1, prob = 0.60)
+)
+
+inf_urb <- ifelse(inf_urb == 1, "OUI", "NON")
+
+# Quantité totale de bactéries suivant une loi log normale
+CFU_tot <- rlnorm(3*n,
+                  meanlog = log(10000), # médiane théorique à 10000 CFU/g
+                  sdlog = 0.18) # paramètre de dispertion
+
+# Création du tableau avec nos données
+donnees <- data.frame(
+  station,
+  tempera,
+  mat_org,
+  inf_urb,
+  CFU_tot
+)
+
+# Affichage des données
+print(donnees)
+
+# Vérification de nos données
+str(donnees)
+summary(donnees)
+
+# Exportation en CSV pour exploiter les données
+write.csv(donnees, "donnees_microbiologie.csv",
+          row.names = FALSE)
+
+```
+```{r}
+# On charge le fichier et on génère les donées
+source("generate_resistant_bacteria.R")
+donnees <- generate_resistant_bacteria(donnees)
+
+# On vérifie le résultat et les colonnes
+head(donnees)
+str(donnees)
+```
+```{r}
+# On ajoute la colonne CFU_rst
+donnees$CFU_rst <- generate_resistant_bacteria(donnees)$CFU_rst
+names(donnees)
+View(donnees)
+```
+
+```{r}
+
+# On définit la proportion de bacteries resistantes
+prop <- donnees$CFU_rst / donnees$CFU_tot
+
+# Transformation logarithmique en base 10 de la proportion
+log_prop <- log10(prop + 1)
+
+# Statistiques par station
+# La moyenne
+moyennes <- aggregate(
+  log_prop ~ station,
+  data = donnees,
+  FUN = mean
+)
+
+# La mediane
+medianes <- aggregate(
+  log_prop ~ station,
+  data = donnees,
+  FUN = median
+)
+
+# L'écart-type
+ecarts_types <- aggregate(
+  log_prop ~ station,
+  data = donnees,
+  FUN = sd
+)
+
+# On crée un tableau recapitulatif
+resultats <- data.frame(
+  Station = moyennes$station,
+  Moyenne = moyennes$log_prop,
+  Mediane = medianes$log_prop,
+  Ecart_type = ecarts_types$log_prop
+)
+
+print(resultats)
+
+```
+On remarque que la moyenne et la médiane les plus élevées concernent la station 
+V et les plus faibles concernent la station A. Il y a donc en moyenne une 
+proportion plus élevée de bactéries résistantes au niveau du rejet urbain. 
+Au contraire, on observe une moindre proportion moyenne en amont.
+
+```{r}
+# Graphique boite a moustaches
+boxplot(
+  log_prop ~ station,
+  data = donnees,
+  main = "Proportion de bacteries resistantes par station",
+  xlab = "Station",
+  ylab = "Log10(proportion + 1)",
+  col = c("lightblue","lightpink", "lightgreen")
+)
+
+```
+Sur ce graphique, on observe une médiane plus élevée pour la station V, 
+intermédiaire pour la station E et plus faible pour la station A. 
+Cela nous permet de mieux visualiser les résultats obtenus précédemment.
+
+```{r}
+
+# Graphique de la matiere organique
+
+plot(
+  donnees$mat_org * 100,
+  donnees$log_prop,
+  col = as.numeric(donnees$station),
+  pch = 19,
+  xlab = "Matiere organique (%)",
+  ylab = "Log10(proportion + 1)",
+  main = "Resistance bacterienne et matiere organique"
+)
+
+legend(
+  "topright",
+  legend = c("A", "V", "E"),
+  col = 1:3,
+  pch = 19
+)
+
+```
+Sur ce graphique on observe .
+
+```{r}
+plot(donnees$mat_org, log_prop,
+     col = donnees$station,
+     pch = 19,
+     main = "Résistance bactérienne selon la matière organique",
+     xlab = "Matière organique",
+     ylab = "Proportion résistante (log10)")
+
+legend(
+  "topright",
+  legend = c("A", "V", "E"),
+  col = 1:3,
+  pch = 19
+) 
+```
+Sur ce graphique on observe que la concentration en matière organique n'impacte 
+pas la présence de résistance bactérienne. En effet, on observe la présence de 
+résistance pour chaque station à toutes les concentrations en matière organique. 
+On remarque cependant une stratification avec des valeurs plus faibles pour la 
+station A, intermédiaire pour la station E et plus élevées pour la station V.
+
+On réalise ensuite un test de corrélation de Pearson afin de vérifier s'il y a
+une corrélation ou non entre nos variables.
+
+```{r}
+by(donnees, donnees$station, function(d) {
+  cor.test(d$mat_org, log_prop[donnees$station == d$station[1]],
+           method = "pearson")
+})
+```
+Les résultats étant très proches de 0 et les p-value étant toutes supérieures 
+à 0.05, on peut dire que les résultats ne sont pas significarifs. 
+On en déduit donc qu'il n'y a pas de corrélation entre la 
+proportion de résistance et la concentration en matière organique pour chacune 
+des stations.
+
+```{r}
+plot(donnees$tempera, log_prop,
+     col = donnees$station,
+     pch = 19,
+     main = "Résistance bactérienne selon la température",
+     xlab = "Température (°C)",
+     ylab = "Proportion résistante (log10)")
+
+legend(
+  "topleft",
+  legend = c("A", "V", "E"),
+  col = 1:3,
+  pch = 19
+)
+abline(lm(log_prop ~ donnees$tempera), col = "red", lwd = 2)
+```
+Sur ce graphique, on peut voir que les bactéries résistantes de la station A 
+sont distribuées entre 0 et 16°C et à des proportions plus faibles que les 
+autres stations, c'est-à-dire entre 0 et 0.15. Celles de la station V sont 
+distribuées entre 14 et 19°C à des proportions entre 0.20 et 0.
+30. Enfin, celles de la station E entre 15 et 19°C et à des proportions entre 
+0.15 et 0.25.
+On peut donc estimer que les bactéries résistantes de la station A sont plus 
+sensibles à des températures moyennes que celles des deux autres stations.
+
+On fait un test de corrélation de Pearson afin de vérifier les résultats 
+annoncés par le graphique.
+
+```{r}
+by(donnees, donnees$station, function(d) {
+  cor.test(d$tempera, log_prop[donnees$station == d$station[1]],
+           method = "pearson")
+})
+```
+Les résultats étant très proches de 1 et les p-value bien inférieures à 0.05, 
+on peut dire qu'il y a bien une corrélation positive entre la température et la 
+proportion de résistance bactérienne.
+
+On réalise ensuite un test de Shapiro afin de s'assurer que les données suivent
+ou non une distribution normale.
+
+```{r}
+by(log_prop, donnees$station, shapiro.test)
+```
+Dans le cas de ce test, la station A dispose d'une p-value inférieure à 0.05, 
+on doit donc rejeter l'hypothèse de normalité des données. Pour les deux autres 
+stations, la p-value est supérieure à 0.05. Alors pour les stations V et E on 
+ne rejette pas l'hypothèse de la normalité. 
+
+```{r} 
+# On test l'homogénéité des variances entre les stations.
+fligner.test(log_prop ~ station, data = donnees)
+```
+On utilise le test de Fligner-Killeen car la normalité n'est pas respectée pour 
+toutes les stations. La p-value étant supérieure à 0.05, elle est significative. 
+Donc on ne rejette pas l'hypothèse selon laquelle il n'y a pas de différence. 
+On peut en déduire qu'il n'y a pas de différence significatives entre les 
+variances des différentes stations.
+
+```{r}
+# On teste alors la différence de moyenne de log_prop :
+kruskal.test(log_prop ~ donnees$station)
+```
+On a choisi un test de Kruskal-Wallis car nous avions besoin de tester plus de 
+2 valeurs qui étaient indépendantes.
+Le résultat de la p-value étant très inférieure à 0.05, donc significatif, on 
+rejette l'hypothèse qu'il n'y a pas de différence entre les moyennes. 
+On peut donc en déduire qu'il y a une différence sans pour autant savoir d'où 
+elle vient.
+
+Pour savoir d'où vient la différence on utilise donc le test de Dunn avec 
+correction de Holm. Tous nos groupes ne suivant pas la normalité ce test est 
+applicable.
+
+```{r}
+install.packages("FSA")
+```
+```{r}
+library(FSA)
+
+dunnTest(log_prop ~ donnees$station,
+         method = "holm")
+```
+Pour ce test, nos résultats ajustés sont tous significatifs avec des p-value 
+largement inférieures à 0.05. Il y a donc des différences significatives entre 
+chaque groupe.
+Cependant on remarque une différence plus grande entre les stations A et V.
+
+On en conclu donc que la station V est celle qui dispose du plus grand nombre 
+de bactéries résistantes. Il faudrait alors tester si cela est dû ou non au 
+fait que la station est située au niveau des rejets urbains.
+
+```{r}
+# On visualise sous forme de tableau l'influence urbaine selon les stations.
+table(donnees$station, donnees$inf_urb)
+```
+```{r}
+# On détermine la proportion de l'influence selon les stations
+prop.table(table(donnees$station, donnees$inf_urb), margin = 1)
+```
+On remarque une proportion proche de l'équilibre pour la station A. Pour la 
+station E, on remarque un léger déséquilibre en faveur de l'influence urbaine. 
+Enfin, pour la station V on observe un déséquilibre très net en faveur de 
+l'influence urbaine.
+
+On teste alors s'il existe une association entre la station et l'influence 
+grâce à un test de Chi2.
+
+```{r}
+chisq.test(table(donnees$station, donnees$inf_urb))
+```
+Pour le Chi2, la p-value est supérieure à 0.05 donc on ne peut pas rejeter 
+l'hypothèse d'indépendance. 
+
+On souhaite ensuite explorer le lien entre log_prop et les variables température 
+et matière organique. Pour cela on doit crée un modèle linéaire généralisé.
+
+On insère donc nos variables dans un modèle que l'on précise gaussien car 
+log_prop est une variable quantitative continue.
+
+```{r}
+modele <- glm(log_prop ~ tempera + mat_org,
+              data = donnees,
+              family = gaussian()) 
+
+summary(modele)
+```
+On obtient alors un coefficien d'environ 0.035 pour la température avec une 
+p-value inférieure à 0.05. Il y a donc association positive de la température et
+de la concentration en bactéries résistantes. Pour chaque degré de température 
+supplémentaire, la concentration augmente de 0.035 unités pour un quantité de 
+matière organique constante.
+Concernant la matière organique, bien qu'ayant un coefficient positif de 0.12,
+sa p-value est de 0.919 donc bien supérieure à 0.05. Cette valeur n'étant pas 
+significative, on ne peut donc pas établir de lien entre la quantité de matière 
+organique et la proportion de bactéries.
+
+De manière générale, nous avons pu mettre en évidence une influence de la 
+température sur la proportion de bactéries résistantes. Celà grâce au test de 
+Pearson mais aussi grâce au modèle linéaire.
+Cependant , aucun lien n'a pu être fait par rapport à la quantité de matière 
+organique présente. Enfin, aucun lien certain n'a pu être mis en évidence entre
+la proportion de bactéries résistantes et l'influence urbaine.
+
+
