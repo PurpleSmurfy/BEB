@@ -1,6 +1,8 @@
 ---
 title: "Examen_final_SUBRA_ileana"
-output: pdf_document
+output:
+  pdf_document:
+    latex_engine: xelatex
 date: "2026-10-30"
 ---
 
@@ -278,7 +280,7 @@ correction de Holm. Tous nos groupes ne suivant pas la normalité ce test est
 applicable.
 
 ```{r}
-install.packages("FSA")
+install.packages("FSA", repos = "https://cloud.r-project.org")
 ```
 ```{r}
 library(FSA)
